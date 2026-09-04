@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HBOT 點數系統</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; max-width: 800px; margin: auto; background-color: #f5f5f7; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .item-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+    
+    /* 左側資訊區塊 */
+    .item-info { width: 65%; }
+    .item-name { font-size: 16px; font-weight: 600; color: #1d1d1f; word-wrap: break-word; margin-bottom: 4px; }
+    .item-meta { font-size: 13px; color: #86868b; }
+    .item-meta span { margin-right: 8px; display: inline-block; }
+    
+    /* 右側點數按鈕區塊 */
+    .controls { display: flex; align-items: center; }
+    button { padding: 8px 16px; font-size: 22px; margin: 0 5px; border: none; border-radius: 8px; background-color: #007aff; color: white; cursor: pointer; touch-action: manipulation; }
+    button:active { background-color: #005bb5; }
+    button:disabled { background-color: #ccc; }
+    .stock-count { font-size: 20px; font-weight: bold; min-width: 45px; text-align: center; color: #1d1d1f; }
+    
+    #loading { text-align: center; color: #86868b; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>庫存點數</h2>
+  </div>
+  <div id="loading">載入資料中，請稍候...</div>
+  <div id="inventory-list"></div>
+
+  <script>
+    // 【修改這裡】貼上你的 Google Web App URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbwaZbkfchS9lXGu9Micizb9xOtHIFrsNt17XyJfyepbOvhpNaY4P8CqdzlVOrNkmNs/exec";
+
+    // 載入清單
+    async function loadData() {
+      try {
+        const response = await fetch(API_URL + "?action=get");
+        const data = await response.json();
+        
+        document.getElementById('loading').style.display = 'none';
+        let listDiv = document.getElementById('inventory-list');
+        listDiv.innerHTML = "";
+
+        data.forEach(item => {
+          // 處理空值顯示
+          let metaHtml = "";
+          if(item.location) metaHtml += `<span>📍 ${item.location}</span>`;
+          if(item.refNo) metaHtml += `<span>🏷️ ${item.refNo}</span>`;
+          if(item.unit) metaHtml += `<span>📦 單位: ${item.unit}</span>`;
+
+          listDiv.innerHTML += `
+            <div class="item-card">
+              <div class="item-info">
+                <div class="item-name">${item.description}</div>
+                <div class="item-meta">${metaHtml}</div>
+              </div>
+              <div class="controls">
+                <button onclick="updateStock(${item.row}, -1, this)">-</button>
+                <div class="stock-count" id="stock-${item.row}">${item.stock}</div>
+                <button onclick="updateStock(${item.row}, 1, this)">+</button>
+              </div>
+            </div>
+          `;
+        });
+      } catch (error) {
+        document.getElementById('loading').innerText = "載入失敗，請檢查網址或網路狀態。";
+      }
+    }
+
+    // 更新數量
+    async function updateStock(row, change, btn) {
+      const stockElement = document.getElementById(`stock-${row}`);
+      let currentStock = parseInt(stockElement.innerText);
+      let newStock = currentStock + change;
+      
+      if (newStock < 0) return; // 防止數量小於 0
+
+      // 1. 先在畫面上更新數字
+      stockElement.innerText = newStock;
+      
+      // 防止連點
+      const buttons = btn.parentElement.querySelectorAll('button');
+      buttons.forEach(b => b.disabled = true);
+
+      // 2. 背景傳送資料去 Google Sheets
+      try {
+        await fetch(`${API_URL}?action=update&row=${row}&change=${change}`);
+      } catch (error) {
+        alert("網路錯誤，同步失敗！數字將退回。");
+        stockElement.innerText = currentStock; 
+      }
+
+      buttons.forEach(b => b.disabled = false);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
