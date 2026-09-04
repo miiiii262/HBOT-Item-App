@@ -19,13 +19,17 @@
     
     /* 表格排版 */
     .table-container { width: 100%; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    table { width: 100%; border-collapse: collapse; min-width: 950px; }
     th { background-color: #000000; color: #ffffff; padding: 12px; text-align: center; font-size: 14px; font-weight: normal; letter-spacing: 1px; }
     td { padding: 12px 10px; border-bottom: 1px solid #e0e0e0; text-align: center; vertical-align: middle; }
     
+    /* 照片設計 */
+    .item-photo { width: 64px; height: 64px; object-fit: cover; border: 1px solid #e0e0e0; display: block; margin: auto; }
+    .no-photo { background-color: #f5f5f7; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; text-align: center; line-height: 1.2; font-weight: bold; }
+    
     /* 限制名稱長度並靠左對齊 */
-    .col-name { max-width: 200px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
-    .col-loc { max-width: 120px; font-size: 13px; color: #333333; }
+    .col-name { max-width: 180px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+    .col-loc { max-width: 110px; font-size: 13px; color: #333333; }
     
     /* 數字與按鈕設計 (黑白線條風) */
     .controls { display: inline-flex; align-items: center; justify-content: center; }
@@ -63,6 +67,7 @@
     <table id="inventory-table" style="display: none;">
       <thead>
         <tr>
+          <th style="width: 80px;">PHOTO</th>
           <th style="text-align: left;">ITEM DESCRIPTION</th>
           <th>LOCATION</th>
           <th>TARGET (QTY)</th>
@@ -76,12 +81,11 @@
   </div>
 
   <script>
-    // 已經幫你替換好專屬的 API URL
+    // 你的專屬 API 網址 (已更新確認)
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     
     let inventoryData = [];
 
-    // 1. 載入資料
     async function loadData() {
       try {
         const response = await fetch(API_URL + "?action=get");
@@ -97,7 +101,6 @@
       }
     }
 
-    // 2. 渲染表格
     function renderTable() {
       const tbody = document.getElementById('inventory-list');
       tbody.innerHTML = "";
@@ -106,10 +109,15 @@
         const tr = document.createElement('tr');
         if(item.isModified) tr.className = "modified-row";
         
-        // 判斷 Order Needed 是否大於 0，給予紅色 Alert class
         const orderNeededClass = item.orderNeeded > 0 ? "alert-red" : "";
+        
+        // 判斷是否有照片網址，有則顯示圖片，無則顯示灰色 NO PHOTO 區塊
+        const photoHtml = item.imgUrl && item.imgUrl.trim() !== "" 
+          ? `<img src="${item.imgUrl}" class="item-photo" alt="Item Photo">`
+          : `<div class="item-photo no-photo">NO<br>PHOTO</div>`;
 
         tr.innerHTML = `
+          <td>${photoHtml}</td>
           <td class="col-name" title="${item.description}">${item.description}</td>
           <td class="col-loc">${item.location}</td>
           <td style="font-size: 18px; font-weight: bold; color: #666;">${item.qty}</td>
@@ -138,7 +146,6 @@
       });
     }
 
-    // 3. 更新 Current Stock (連動計算 Order Needed)
     function updateCurrentStock(index, change) {
       let item = inventoryData[index];
       item.stock = parseInt(item.stock) + change;
@@ -152,7 +159,6 @@
       renderTable();
     }
 
-    // 4. 手動覆蓋更新 Order Needed
     function updateOrderNeeded(index, change) {
       let item = inventoryData[index];
       item.orderNeeded = parseInt(item.orderNeeded) + change;
@@ -162,13 +168,11 @@
       renderTable();
     }
 
-    // 5. 更新 Remark
     function updateRemark(index, val) {
       inventoryData[index].remark = val;
       inventoryData[index].isModified = true;
     }
 
-    // 6. 批量儲存
     async function saveData() {
       const modifiedItems = inventoryData.filter(item => item.isModified);
       
@@ -178,18 +182,13 @@
       }
 
       const userName = prompt("Enter Staff Name to confirm save:", "");
-      if (userName === null || userName.trim() === "") {
-        return; // 取消或未輸入姓名則終止
-      }
+      if (userName === null || userName.trim() === "") return;
 
       const saveBtn = document.getElementById('save-btn');
       saveBtn.innerText = "SAVING...";
       saveBtn.disabled = true;
 
-      const payload = {
-        userName: userName.trim(),
-        items: modifiedItems
-      };
+      const payload = { userName: userName.trim(), items: modifiedItems };
 
       try {
         const response = await fetch(API_URL, {
@@ -213,7 +212,6 @@
       saveBtn.disabled = false;
     }
 
-    // 啟動載入
     loadData();
   </script>
 </body>
