@@ -98,6 +98,16 @@
       buttons.forEach(b => b.disabled = false);
     }
 
+    <script>
+    // 加入這段簡單的密碼檢查
+    const password = prompt("請輸入密碼：");
+    if (password !== "hbot888") { // 這裡的 hbot888 可以改成你想要的密碼
+      document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>密碼錯誤，拒絕存取。</h2>";
+      throw new Error("密碼錯誤"); // 停止執行後面的程式
+    }
+
+    // 下面繼續你原本的代碼...
+    const API_URL = "https://script.google.com/macros/s/AKfycbwaZbkfchS9lXGu9Micizb9xOtHIFrsNt17XyJfyepbOvhpNaY4P8CqdzlVOrNkmNs/exec";
     loadData();
   </script>
 </body>
