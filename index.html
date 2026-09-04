@@ -1,63 +1,74 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HBOT 點數與訂貨系統</title>
+  <title>HBOT Inventory System</title>
   <style>
-    body { font-family: -apple-system, sans-serif; padding: 15px; margin: auto; background-color: #f5f5f7; }
+    /* 極簡黑白紅專業風格 */
+    body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; margin: auto; background-color: #ffffff; color: #000000; max-width: 1200px; }
     
     /* 頂部控制列 */
-    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; position: sticky; top: 0; background: #f5f5f7; padding-bottom: 10px; z-index: 100; border-bottom: 2px solid #ccc; }
-    .status-text { font-size: 14px; color: #86868b; }
-    .save-btn { padding: 12px 25px; font-size: 18px; font-weight: bold; background-color: #34c759; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .save-btn:active { background-color: #248a3d; }
+    .header-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #000000; }
+    .header-title { margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px; }
+    .status-text { font-size: 13px; color: #666666; margin-top: 5px; }
+    
+    .save-btn { padding: 10px 30px; font-size: 16px; font-weight: bold; background-color: #000000; color: #ffffff; border: 2px solid #000000; cursor: pointer; transition: all 0.2s; }
+    .save-btn:hover, .save-btn:active { background-color: #ffffff; color: #000000; }
+    .save-btn:disabled { background-color: #cccccc; border-color: #cccccc; cursor: not-allowed; }
     
     /* 表格排版 */
-    .table-container { overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .table-container { width: 100%; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 900px; }
-    th { background-color: #e5e5ea; padding: 12px; text-align: center; border: 1px solid #d1d1d6; font-size: 16px; }
-    td { padding: 10px; border: 1px solid #d1d1d6; text-align: center; vertical-align: middle; }
+    th { background-color: #000000; color: #ffffff; padding: 12px; text-align: center; font-size: 14px; font-weight: normal; letter-spacing: 1px; }
+    td { padding: 12px 10px; border-bottom: 1px solid #e0e0e0; text-align: center; vertical-align: middle; }
     
-    /* 限制 Item Name 長度，超出的用 ..... 顯示 */
-    .col-name { max-width: 160px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
-    .col-loc { max-width: 100px; color: #555; }
+    /* 限制名稱長度並靠左對齊 */
+    .col-name { max-width: 200px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+    .col-loc { max-width: 120px; font-size: 13px; color: #333333; }
     
-    /* 數字與按鈕放大 */
+    /* 數字與按鈕設計 (黑白線條風) */
     .controls { display: inline-flex; align-items: center; justify-content: center; }
-    .controls button { padding: 0; width: 40px; height: 40px; font-size: 26px; font-weight: bold; margin: 0 8px; border: none; border-radius: 6px; background-color: #007aff; color: white; cursor: pointer; touch-action: manipulation; }
-    .controls button:active { background-color: #005bb5; }
-    .stock-val { font-size: 24px; font-weight: bold; width: 50px; text-align: center; }
+    .controls button { width: 32px; height: 32px; font-size: 20px; line-height: 1; margin: 0 10px; border: 1px solid #000000; background-color: #ffffff; color: #000000; cursor: pointer; touch-action: manipulation; }
+    .controls button:active { background-color: #000000; color: #ffffff; }
     
-    /* Remark 文字框 */
-    .remark-input { width: 90%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .stock-val { font-size: 20px; font-weight: bold; width: 45px; text-align: center; }
     
-    /* 標記已修改的列 */
-    .modified-row { background-color: #ffffe0; }
+    /* 紅色警示 (當需要訂貨時) */
+    .alert-red { color: #d90000; font-weight: bold; }
+    
+    /* 備註輸入框 */
+    .remark-input { width: 90%; padding: 8px; font-size: 14px; border: 1px solid #000000; background-color: #ffffff; outline: none; }
+    .remark-input:focus { border-width: 2px; }
+    
+    /* 已修改標記 (左側加上黑線) */
+    .modified-row td:first-child { border-left: 4px solid #000000; padding-left: 6px; }
+    
+    #loading { text-align: center; padding: 40px; font-size: 16px; letter-spacing: 1px; color: #666; }
   </style>
 </head>
 <body>
 
   <div class="header-bar">
     <div>
-      <h2 style="margin: 0;">HBOT 點數系統</h2>
-      <div class="status-text" id="last-update">Last Update: 從未</div>
+      <h2 class="header-title">HBOT INVENTORY</h2>
+      <div class="status-text" id="last-update">Last Update: --</div>
     </div>
-    <button class="save-btn" onclick="saveData()">💾 儲存 (Save)</button>
+    <button class="save-btn" id="save-btn" onclick="saveData()">SAVE RECORD</button>
   </div>
   
-  <div id="loading" style="text-align: center; padding: 20px;">載入資料中...</div>
+  <div id="loading">LOADING DATA...</div>
 
   <div class="table-container">
     <table id="inventory-table" style="display: none;">
       <thead>
         <tr>
-          <th>Item Name</th>
-          <th>Location</th>
-          <th>QTY (Target)</th>
-          <th>Current Stock</th>
-          <th>Order Needed</th>
-          <th>Remark</th>
+          <th style="text-align: left;">ITEM DESCRIPTION</th>
+          <th>LOCATION</th>
+          <th>TARGET (QTY)</th>
+          <th>CURRENT STOCK</th>
+          <th>ORDER NEEDED</th>
+          <th>REMARKS</th>
         </tr>
       </thead>
       <tbody id="inventory-list"></tbody>
@@ -65,8 +76,8 @@
   </div>
 
   <script>
-    // 【修改這裡】貼上你的 Google Web App URL
-    const API_URL = "YOUR_GOOGLE_WEB_APP_URL";
+    // 已經幫你替換好專屬的 API URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     
     let inventoryData = [];
 
@@ -76,14 +87,13 @@
         const response = await fetch(API_URL + "?action=get");
         inventoryData = await response.json();
         
-        // 標記每一列是否被手動修改過，預設為 false
         inventoryData.forEach(item => item.isModified = false);
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('inventory-table').style.display = 'table';
         renderTable();
       } catch (error) {
-        document.getElementById('loading').innerText = "載入失敗，請檢查網址或網路。";
+        document.getElementById('loading').innerText = "ERROR: Failed to load data. Please check network.";
       }
     }
 
@@ -94,12 +104,15 @@
 
       inventoryData.forEach((item, index) => {
         const tr = document.createElement('tr');
-        if(item.isModified) tr.className = "modified-row"; // 提示哪些有修改
+        if(item.isModified) tr.className = "modified-row";
+        
+        // 判斷 Order Needed 是否大於 0，給予紅色 Alert class
+        const orderNeededClass = item.orderNeeded > 0 ? "alert-red" : "";
 
         tr.innerHTML = `
           <td class="col-name" title="${item.description}">${item.description}</td>
           <td class="col-loc">${item.location}</td>
-          <td style="font-size: 20px; font-weight: bold; color: #ff3b30;">${item.qty}</td>
+          <td style="font-size: 18px; font-weight: bold; color: #666;">${item.qty}</td>
           
           <td>
             <div class="controls">
@@ -111,27 +124,26 @@
           
           <td>
             <div class="controls">
-              <button style="background-color: #ff9500;" onclick="updateOrderNeeded(${index}, -1)">-</button>
-              <div class="stock-val">${item.orderNeeded}</div>
-              <button style="background-color: #ff9500;" onclick="updateOrderNeeded(${index}, 1)">+</button>
+              <button onclick="updateOrderNeeded(${index}, -1)">-</button>
+              <div class="stock-val ${orderNeededClass}">${item.orderNeeded}</div>
+              <button onclick="updateOrderNeeded(${index}, 1)">+</button>
             </div>
           </td>
           
           <td>
-            <input type="text" class="remark-input" value="${item.remark}" placeholder="特殊備註..." onchange="updateRemark(${index}, this.value)">
+            <input type="text" class="remark-input" value="${item.remark}" placeholder="..." onchange="updateRemark(${index}, this.value)">
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // 3. 更新 Current Stock (並連動計算 Order Needed)
+    // 3. 更新 Current Stock (連動計算 Order Needed)
     function updateCurrentStock(index, change) {
       let item = inventoryData[index];
       item.stock = parseInt(item.stock) + change;
       if (item.stock < 0) item.stock = 0;
       
-      // 動態計算 Order Needed: QTY - Current Stock
       let qtyNum = parseInt(item.qty) || 0;
       let calculatedOrder = qtyNum - item.stock;
       item.orderNeeded = calculatedOrder > 0 ? calculatedOrder : 0;
@@ -156,24 +168,22 @@
       inventoryData[index].isModified = true;
     }
 
-    // 6. 批量儲存資料 (只傳送有修改過的列以節省時間)
+    // 6. 批量儲存
     async function saveData() {
       const modifiedItems = inventoryData.filter(item => item.isModified);
       
       if (modifiedItems.length === 0) {
-        alert("沒有任何修改需要儲存！");
+        alert("No changes detected.");
         return;
       }
 
-      // 要求輸入姓名
-      const userName = prompt("請輸入您的姓名以儲存紀錄：", "");
+      const userName = prompt("Enter Staff Name to confirm save:", "");
       if (userName === null || userName.trim() === "") {
-        alert("必須輸入姓名才能儲存。");
-        return;
+        return; // 取消或未輸入姓名則終止
       }
 
-      const saveBtn = document.querySelector('.save-btn');
-      saveBtn.innerText = "儲存中...";
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.innerText = "SAVING...";
       saveBtn.disabled = true;
 
       const payload = {
@@ -182,7 +192,6 @@
       };
 
       try {
-        // 使用 POST 發送整批 JSON 資料
         const response = await fetch(API_URL, {
           method: 'POST',
           body: JSON.stringify(payload)
@@ -191,21 +200,20 @@
 
         if (result.success) {
           document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
-          alert("✅ 儲存成功！");
+          alert("Records saved successfully.");
           
-          // 重置修改標記
           inventoryData.forEach(item => item.isModified = false);
           renderTable();
         }
       } catch (error) {
-        alert("❌ 儲存失敗，請檢查網路！");
+        alert("ERROR: Failed to save. Please check network.");
       }
 
-      saveBtn.innerText = "💾 儲存 (Save)";
+      saveBtn.innerText = "SAVE RECORD";
       saveBtn.disabled = false;
     }
 
-    // 開啟網頁即載入資料
+    // 啟動載入
     loadData();
   </script>
 </body>
