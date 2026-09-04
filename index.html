@@ -33,10 +33,17 @@
   <div id="inventory-list"></div>
 
   <script>
-    // 【修改這裡】貼上你的 Google Web App URL
+    // 1. 密碼檢查 (放在最前面)
+    const password = prompt("請輸入密碼：");
+    if (password !== "hbot888") { 
+      document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>密碼錯誤，拒絕存取。</h2>";
+      throw new Error("密碼錯誤"); // 停止執行
+    }
+
+    // 2. 宣告 API 網址 (整合為一個)
     const API_URL = "https://script.google.com/macros/s/AKfycbwaZbkfchS9lXGu9Micizb9xOtHIFrsNt17XyJfyepbOvhpNaY4P8CqdzlVOrNkmNs/exec";
 
-    // 載入清單
+    // 3. 載入清單函數
     async function loadData() {
       try {
         const response = await fetch(API_URL + "?action=get");
@@ -47,7 +54,6 @@
         listDiv.innerHTML = "";
 
         data.forEach(item => {
-          // 處理空值顯示
           let metaHtml = "";
           if(item.location) metaHtml += `<span>📍 ${item.location}</span>`;
           if(item.refNo) metaHtml += `<span>🏷️ ${item.refNo}</span>`;
@@ -72,7 +78,7 @@
       }
     }
 
-    // 更新數量
+    // 4. 更新數量函數
     async function updateStock(row, change, btn) {
       const stockElement = document.getElementById(`stock-${row}`);
       let currentStock = parseInt(stockElement.innerText);
@@ -80,14 +86,11 @@
       
       if (newStock < 0) return; // 防止數量小於 0
 
-      // 1. 先在畫面上更新數字
       stockElement.innerText = newStock;
       
-      // 防止連點
       const buttons = btn.parentElement.querySelectorAll('button');
       buttons.forEach(b => b.disabled = true);
 
-      // 2. 背景傳送資料去 Google Sheets
       try {
         await fetch(`${API_URL}?action=update&row=${row}&change=${change}`);
       } catch (error) {
@@ -98,16 +101,7 @@
       buttons.forEach(b => b.disabled = false);
     }
 
-    <script>
-    // 加入這段簡單的密碼檢查
-    const password = prompt("請輸入密碼：");
-    if (password !== "hbot888") { // 這裡的 hbot888 可以改成你想要的密碼
-      document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>密碼錯誤，拒絕存取。</h2>";
-      throw new Error("密碼錯誤"); // 停止執行後面的程式
-    }
-
-    // 下面繼續你原本的代碼...
-    const API_URL = "https://script.google.com/macros/s/AKfycbwaZbkfchS9lXGu9Micizb9xOtHIFrsNt17XyJfyepbOvhpNaY4P8CqdzlVOrNkmNs/exec";
+    // 5. 執行載入
     loadData();
   </script>
 </body>
