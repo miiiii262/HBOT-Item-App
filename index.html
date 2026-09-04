@@ -7,15 +7,18 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; max-width: 800px; margin: auto; background-color: #f5f5f7; }
     .header { text-align: center; margin-bottom: 20px; }
-    .item-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+    .item-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     
-    /* 左側資訊區塊 */
-    .item-info { width: 65%; }
-    .item-name { font-size: 16px; font-weight: 600; color: #1d1d1f; word-wrap: break-word; margin-bottom: 4px; }
-    .item-meta { font-size: 13px; color: #86868b; }
-    .item-meta span { margin-right: 8px; display: inline-block; }
+    /* 圖片區塊 */
+    .item-image { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; background-color: #e9e9eb; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #86868b; }
     
-    /* 右側點數按鈕區塊 */
+    /* 資訊區塊 */
+    .item-info { flex-grow: 1; }
+    .item-name { font-size: 16px; font-weight: 600; color: #1d1d1f; word-wrap: break-word; margin-bottom: 8px; }
+    .item-meta { font-size: 13px; color: #555; line-height: 1.5; }
+    .order-alert { color: #d93025; font-weight: 600; }
+    
+    /* 按鈕區塊 */
     .controls { display: flex; align-items: center; }
     button { padding: 8px 16px; font-size: 22px; margin: 0 5px; border: none; border-radius: 8px; background-color: #007aff; color: white; cursor: pointer; touch-action: manipulation; }
     button:active { background-color: #005bb5; }
@@ -33,16 +36,15 @@
   <div id="inventory-list"></div>
 
   <script>
-    // 1. 密碼檢查 (放在最前面)
     const password = prompt("請輸入密碼：");
     if (password !== "hbot888") { 
       document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>密碼錯誤，拒絕存取。</h2>";
-      throw new Error("密碼錯誤"); // 停止執行
+      throw new Error("密碼錯誤");
     }
 
-    // 2. 宣告 API 網址 (整合為一個)
-   const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
-    // 3. 載入清單函數
+    // 🚨 記得在這裡貼上你最新的 API_URL 
+    const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
+
     async function loadData() {
       try {
         const response = await fetch(API_URL + "?action=get");
@@ -53,16 +55,26 @@
         listDiv.innerHTML = "";
 
         data.forEach(item => {
-          let metaHtml = "";
-          if(item.location) metaHtml += `<span>📍 ${item.location}</span>`;
-          if(item.refNo) metaHtml += `<span>🏷️ ${item.refNo}</span>`;
-          if(item.unit) metaHtml += `<span>📦 單位: ${item.unit}</span>`;
+          // 計算初始 Order Stock
+          let orderStock = item.qty - item.stock;
+          if (orderStock < 0) orderStock = 0;
+
+          // 判斷是否有圖片
+          let imgHtml = item.photoUrl 
+            ? `<img src="${item.photoUrl}" class="item-image" alt="照片">`
+            : `<div class="item-image">無照片</div>`;
 
           listDiv.innerHTML += `
             <div class="item-card">
+              ${imgHtml}
               <div class="item-info">
                 <div class="item-name">${item.description}</div>
-                <div class="item-meta">${metaHtml}</div>
+                <div class="item-meta">
+                  <div>1. Location: <b>${item.location}</b></div>
+                  <div>2. QTY (目標): <b id="qty-${item.row}">${item.qty}</b></div>
+                  <div>3. Current stock: <b id="meta-stock-${item.row}">${item.stock}</b></div>
+                  <div class="order-alert">4. Order Stock: <b id="order-${item.row}">${orderStock}</b></div>
+                </div>
               </div>
               <div class="controls">
                 <button onclick="updateStock(${item.row}, -1, this)">-</button>
@@ -77,15 +89,27 @@
       }
     }
 
-    // 4. 更新數量函數
     async function updateStock(row, change, btn) {
+      // 取得 DOM 元素
       const stockElement = document.getElementById(`stock-${row}`);
+      const metaStockElement = document.getElementById(`meta-stock-${row}`);
+      const orderElement = document.getElementById(`order-${row}`);
+      const qtyElement = document.getElementById(`qty-${row}`);
+
+      // 計算新庫存
       let currentStock = parseInt(stockElement.innerText);
       let newStock = currentStock + change;
-      
-      if (newStock < 0) return; // 防止數量小於 0
+      if (newStock < 0) return; 
 
+      // 計算新訂購量
+      let qty = parseInt(qtyElement.innerText);
+      let newOrder = qty - newStock;
+      if (newOrder < 0) newOrder = 0;
+
+      // 即時更新前端畫面
       stockElement.innerText = newStock;
+      metaStockElement.innerText = newStock;
+      orderElement.innerText = newOrder;
       
       const buttons = btn.parentElement.querySelectorAll('button');
       buttons.forEach(b => b.disabled = true);
@@ -95,12 +119,17 @@
       } catch (error) {
         alert("網路錯誤，同步失敗！數字將退回。");
         stockElement.innerText = currentStock; 
+        metaStockElement.innerText = currentStock;
+        
+        // 退回訂購量
+        let revertOrder = qty - currentStock;
+        if(revertOrder < 0) revertOrder = 0;
+        orderElement.innerText = revertOrder;
       }
 
       buttons.forEach(b => b.disabled = false);
     }
 
-    // 5. 執行載入
     loadData();
   </script>
 </body>
