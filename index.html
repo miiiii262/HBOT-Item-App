@@ -37,7 +37,6 @@
     .controls button { width: 32px; height: 32px; font-size: 20px; line-height: 1; margin: 0; border: 1px solid #000; background-color: #fff; color: #000; cursor: pointer; }
     .controls button:active { background-color: #000; color: #fff; }
     
-    /* 庫存文字輸入框設計 */
     .stock-input { width: 50px; height: 30px; font-size: 18px; font-weight: bold; text-align: center; border: 1px solid #ccc; margin: 0 6px; outline: none; -moz-appearance: textfield; }
     .stock-input::-webkit-outer-spin-button, .stock-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .stock-input:focus { border-color: #000; border-width: 2px; }
@@ -135,13 +134,24 @@
       try {
         const response = await fetch(API_URL + "?action=get");
         inventoryData = await response.json();
-        inventoryData.forEach(item => item.isModified = false);
+        inventoryData.forEach(item => {
+          item.isModified = false;
+          item.actionLog = ""; // 初始化追蹤訊息
+        });
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('inventory-table').style.display = 'table';
         renderTable();
       } catch (error) {
         document.getElementById('loading').innerText = "ERROR: Failed to load data.";
+      }
+    }
+
+    function appendLog(item, msg) {
+      if(item.actionLog) {
+        item.actionLog += " | " + msg;
+      } else {
+        item.actionLog = msg;
       }
     }
 
@@ -215,20 +225,21 @@
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
       item.isModified = true;
+      appendLog(item, `Stock adjusted to ${item.stock}`);
       renderTable();
     }
 
-    // 新增：處理直接打字輸入庫存的功能
     function setManualStock(index, val) {
       let item = inventoryData[index];
       let num = parseInt(val);
-      if (isNaN(num) || num < 0) num = 0; // 防止輸入非數字或負數
+      if (isNaN(num) || num < 0) num = 0; 
       item.stock = num;
       
       let qtyNum = parseInt(item.qty) || 0;
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
       item.isModified = true;
+      appendLog(item, `Stock typed manually as ${item.stock}`);
       renderTable();
     }
 
@@ -236,12 +247,14 @@
       let item = inventoryData[index];
       item.orderNeeded = Math.max(0, parseInt(item.orderNeeded) + change);
       item.isModified = true;
+      appendLog(item, `Order needed adjusted to ${item.orderNeeded}`);
       renderTable();
     }
 
     function updateRemark(index, val) {
       inventoryData[index].remark = val;
       inventoryData[index].isModified = true;
+      appendLog(inventoryData[index], `Remark updated`);
     }
 
     function receiveItem(index) {
@@ -252,17 +265,21 @@
         let r = parseInt(qty);
         if(r >= 0) {
           inventoryData[index].stock = (parseInt(inventoryData[index].stock) || 0) + r;
+          let logMsg = `Received ${r} items`;
           
           if (r < pending) {
             let missing = pending - r;
             let keepPending = confirm(`WARNING: You ordered ${pending} but only received ${r}.\nThere are ${missing} items missing.\n\nDo you want to keep these ${missing} items on BACKORDER?\n\n- Click OK to keep them Pending.\n- Click Cancel if the supplier cancelled them.`);
             if(keepPending) {
                 inventoryData[index].pendingQty = missing;
+                logMsg += ` (${missing} kept on backorder)`;
             } else {
                 inventoryData[index].pendingQty = 0;
+                logMsg += ` (${missing} cancelled from backorder)`;
             }
           } else {
              inventoryData[index].pendingQty = Math.max(0, pending - r);
+             logMsg += ` (Order complete)`;
           }
           
           let target = parseInt(inventoryData[index].qty) || 0;
@@ -274,6 +291,7 @@
             inventoryData[index].orderTime = "";
           }
           inventoryData[index].isModified = true;
+          appendLog(inventoryData[index], logMsg);
           renderTable();
         }
       }
@@ -348,6 +366,7 @@
           inventoryData[idx].orderNeeded = Math.max(0, target - inventoryData[idx].stock - inventoryData[idx].pendingQty);
           inventoryData[idx].remark = newRemark;
           inventoryData[idx].isModified = true;
+          appendLog(inventoryData[idx], `Ordered ${orderAmt} items`);
         }
       });
 
@@ -379,7 +398,12 @@
         if (result.success) {
           document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
           alert("Records saved and Ward Stock PDF generated.");
-          inventoryData.forEach(item => item.isModified = false);
+          
+          // 存檔成功後，清空追蹤紀錄狀態
+          inventoryData.forEach(item => {
+            item.isModified = false;
+            item.actionLog = ""; 
+          });
           renderTable();
         }
       } catch (error) {
