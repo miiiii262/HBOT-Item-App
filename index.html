@@ -49,7 +49,8 @@
     .modified-row td:first-child { border-left: 4px solid #000; padding-left: 6px; }
     
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; justify-content: center; align-items: center; }
-    .modal-content { background: #fff; padding: 25px; max-width: 850px; width: 95%; max-height: 85vh; overflow-y: auto; border: 2px solid #000; position: relative; }
+    /* 加寬彈出視窗以容納 Remark 欄位 */
+    .modal-content { background: #fff; padding: 25px; max-width: 1000px; width: 95%; max-height: 85vh; overflow-y: auto; border: 2px solid #000; position: relative; }
     .close-btn { position: absolute; top: 10px; right: 20px; font-size: 28px; cursor: pointer; font-weight: bold; }
     
     .todo-qty-input { width: 60px; padding: 5px; font-size: 16px; text-align: center; border: 1px solid #000; }
@@ -109,6 +110,8 @@
             <th style="text-align: left;">ITEM DESCRIPTION</th>
             <th>SUGGESTED</th>
             <th>ORDER QTY</th>
+            <!-- 新增 REMARK 欄位 -->
+            <th style="width: 30%;">REMARK</th>
           </tr>
         </thead>
         <tbody id="todo-list-body"></tbody>
@@ -159,7 +162,6 @@
         let orderStatusHtml = "";
         let pQty = parseInt(item.pendingQty) || 0;
         
-        // Isolate pending orders into a distinct visual block
         if(item.isOrdered === 'Y' || pQty > 0) {
           orderStatusHtml = `
             <div class="pending-box">
@@ -203,11 +205,9 @@
     function updateCurrentStock(index, change) {
       let item = inventoryData[index];
       item.stock = Math.max(0, parseInt(item.stock) + change);
-      
       let qtyNum = parseInt(item.qty) || 0;
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
-      
       item.isModified = true;
       renderTable();
     }
@@ -233,11 +233,9 @@
         if(r >= 0) {
           inventoryData[index].stock = (parseInt(inventoryData[index].stock) || 0) + r;
           
-          // Logic to handle missing/partial deliveries
           if (r < pending) {
             let missing = pending - r;
             let keepPending = confirm(`WARNING: You ordered ${pending} but only received ${r}.\nThere are ${missing} items missing.\n\nDo you want to keep these ${missing} items on BACKORDER?\n\n- Click OK to keep them Pending.\n- Click Cancel if the supplier cancelled them.`);
-            
             if(keepPending) {
                 inventoryData[index].pendingQty = missing;
             } else {
@@ -277,19 +275,21 @@
       inventoryData.forEach((item, index) => {
         if(item.orderNeeded > 0) {
           hasTasks = true;
+          // 在彈出視窗中加入備註輸入框
           tbody.innerHTML += `
             <tr>
               <td><input type="checkbox" class="todo-checkbox row-cb" data-index="${index}"></td>
               <td style="text-align:left; font-weight:bold;">${item.description}</td>
-              <td style="color:#d90000; font-weight:bold;">${item.orderNeeded}</td>
-              <td><input type="number" class="todo-qty-input" id="batch-qty-${index}" value="${item.orderNeeded}" min="1"></td>
+              <td style="color:#d90000; font-weight:bold; text-align:center;">${item.orderNeeded}</td>
+              <td style="text-align:center;"><input type="number" class="todo-qty-input" id="batch-qty-${index}" value="${item.orderNeeded}" min="1"></td>
+              <td><input type="text" class="remark-input" id="batch-remark-${index}" value="${item.remark}" placeholder="..." style="width: 100%; box-sizing: border-box;"></td>
             </tr>
           `;
         }
       });
       
       if(!hasTasks) {
-        tbody.innerHTML = `<tr><td colspan="4" style="padding: 20px; text-align:center;">No items currently need to be ordered.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align:center;">No items currently need to be ordered.</td></tr>`;
       }
       document.getElementById('todo-modal').style.display = 'flex';
     }
@@ -317,6 +317,7 @@
       checkboxes.forEach(cb => {
         let idx = cb.getAttribute('data-index');
         let orderAmt = parseInt(document.getElementById(`batch-qty-${idx}`).value);
+        let newRemark = document.getElementById(`batch-remark-${idx}`).value; // 抓取 To-Do list 裡的備註
         
         if(orderAmt > 0) {
           inventoryData[idx].isOrdered = "Y";
@@ -326,6 +327,7 @@
           
           let target = parseInt(inventoryData[idx].qty) || 0;
           inventoryData[idx].orderNeeded = Math.max(0, target - inventoryData[idx].stock - inventoryData[idx].pendingQty);
+          inventoryData[idx].remark = newRemark; // 更新備註
           inventoryData[idx].isModified = true;
         }
       });
@@ -335,6 +337,11 @@
     }
 
     async function saveData() {
+      // 強制讓當前正在輸入的游標失去焦點，確保輸入的內容觸發更新
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+
       const modifiedItems = inventoryData.filter(item => item.isModified);
       if (modifiedItems.length === 0) { alert("No changes detected."); return; }
 
