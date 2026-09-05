@@ -38,10 +38,12 @@
     .controls button:active { background-color: #000; color: #fff; }
     .stock-val { font-size: 20px; font-weight: bold; width: 45px; text-align: center; }
     
-    .alert-red { color: #d90000; font-weight: bold; }
-    .pending-box { margin-top: 10px; padding: 8px; background-color: #fffaf0; border: 2px solid #ff9500; border-radius: 4px; text-align: left; }
-    .pending-title { color: #ff9500; font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px; }
+    /* 專業紅綠配色 */
+    .alert-red { color: #cc0000; font-weight: bold; }
+    .pending-box { margin-top: 10px; padding: 8px; background-color: #f1f8f3; border: 2px solid #1e7e34; border-radius: 4px; text-align: left; }
+    .pending-title { color: #1e7e34; font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px; }
     .order-info { font-size: 11px; color: #555; line-height: 1.3; }
+    
     .btn-receive { margin-top: 8px; width: 100%; font-size: 12px; padding: 6px; background-color: #fff; border: 2px solid #000; cursor: pointer; font-weight: bold; }
     .btn-receive:hover { background-color: #f0f0f0; }
     
@@ -49,7 +51,6 @@
     .modified-row td:first-child { border-left: 4px solid #000; padding-left: 6px; }
     
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; justify-content: center; align-items: center; }
-    /* 加寬彈出視窗以容納 Remark 欄位 */
     .modal-content { background: #fff; padding: 25px; max-width: 1000px; width: 95%; max-height: 85vh; overflow-y: auto; border: 2px solid #000; position: relative; }
     .close-btn { position: absolute; top: 10px; right: 20px; font-size: 28px; cursor: pointer; font-weight: bold; }
     
@@ -67,13 +68,14 @@
       <div class="status-text" id="last-update">Last Update: --</div>
     </div>
     <div class="btn-group">
-      <button class="btn btn-todo" onclick="openTodoModal()">📋 TO-DO LIST</button>
+      <!-- 移除 Emoji -->
+      <button class="btn btn-todo" onclick="openTodoModal()">TO-DO LIST</button>
       <button class="btn btn-save" id="save-btn" onclick="saveData()">SAVE RECORD</button>
     </div>
   </div>
 
   <div class="search-container">
-    <input type="text" id="search-bar" class="search-input" onkeyup="filterTable()" placeholder="🔍 Search item description or location...">
+    <input type="text" id="search-bar" class="search-input" onkeyup="filterTable()" placeholder="Search item description or location...">
   </div>
   
   <div id="loading">LOADING DATA...</div>
@@ -110,7 +112,6 @@
             <th style="text-align: left;">ITEM DESCRIPTION</th>
             <th>SUGGESTED</th>
             <th>ORDER QTY</th>
-            <!-- 新增 REMARK 欄位 -->
             <th style="width: 30%;">REMARK</th>
           </tr>
         </thead>
@@ -163,11 +164,12 @@
         let pQty = parseInt(item.pendingQty) || 0;
         
         if(item.isOrdered === 'Y' || pQty > 0) {
+          // 移除 Emoji，套用專業綠色
           orderStatusHtml = `
             <div class="pending-box">
-              <span class="pending-title">🚚 BACKORDER: ${pQty}</span>
+              <span class="pending-title">BACKORDER: ${pQty}</span>
               <span class="order-info">Ordered by: ${item.orderedBy}<br>${item.orderTime}</span>
-              <button class="btn-receive" onclick="receiveItem(${index})">☑️ RECEIVE</button>
+              <button class="btn-receive" onclick="receiveItem(${index})">RECEIVE</button>
             </div>
           `;
         }
@@ -275,12 +277,11 @@
       inventoryData.forEach((item, index) => {
         if(item.orderNeeded > 0) {
           hasTasks = true;
-          // 在彈出視窗中加入備註輸入框
           tbody.innerHTML += `
             <tr>
               <td><input type="checkbox" class="todo-checkbox row-cb" data-index="${index}"></td>
               <td style="text-align:left; font-weight:bold;">${item.description}</td>
-              <td style="color:#d90000; font-weight:bold; text-align:center;">${item.orderNeeded}</td>
+              <td style="color:#cc0000; font-weight:bold; text-align:center;">${item.orderNeeded}</td>
               <td style="text-align:center;"><input type="number" class="todo-qty-input" id="batch-qty-${index}" value="${item.orderNeeded}" min="1"></td>
               <td><input type="text" class="remark-input" id="batch-remark-${index}" value="${item.remark}" placeholder="..." style="width: 100%; box-sizing: border-box;"></td>
             </tr>
@@ -317,7 +318,7 @@
       checkboxes.forEach(cb => {
         let idx = cb.getAttribute('data-index');
         let orderAmt = parseInt(document.getElementById(`batch-qty-${idx}`).value);
-        let newRemark = document.getElementById(`batch-remark-${idx}`).value; // 抓取 To-Do list 裡的備註
+        let newRemark = document.getElementById(`batch-remark-${idx}`).value;
         
         if(orderAmt > 0) {
           inventoryData[idx].isOrdered = "Y";
@@ -327,7 +328,7 @@
           
           let target = parseInt(inventoryData[idx].qty) || 0;
           inventoryData[idx].orderNeeded = Math.max(0, target - inventoryData[idx].stock - inventoryData[idx].pendingQty);
-          inventoryData[idx].remark = newRemark; // 更新備註
+          inventoryData[idx].remark = newRemark;
           inventoryData[idx].isModified = true;
         }
       });
@@ -337,7 +338,6 @@
     }
 
     async function saveData() {
-      // 強制讓當前正在輸入的游標失去焦點，確保輸入的內容觸發更新
       if (document.activeElement) {
         document.activeElement.blur();
       }
