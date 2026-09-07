@@ -23,7 +23,6 @@
     .btn-save { background-color: #000; color: #fff; }
     .btn-save:hover, .btn-save:active { background-color: #333; color: #fff; }
     
-    /* 通知徽章設計 (Notification Badges) */
     .badge { position: absolute; top: -8px; right: -8px; background-color: #cc0000; color: white; border-radius: 50%; padding: 3px 8px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .badge-green { background-color: #1e7e34; }
 
@@ -96,7 +95,7 @@
     <table id="inventory-table" style="display: none;">
       <thead>
         <tr>
-          <th style="width: 70px;">PHOTO</th>
+          <th style="width: 75px;">PHOTO</th>
           <th style="text-align: left;">ITEM DESCRIPTION</th>
           <th>LOCATION</th>
           <th>TARGET</th>
@@ -185,7 +184,6 @@
       else { item.actionLog = msg; }
     }
 
-    // 計算並更新上方按鈕的通知徽章
     function updateBadges() {
       let todoCount = 0;
       let receiveCount = 0;
@@ -217,9 +215,18 @@
         if(item.isModified) tr.className = "modified-row";
         
         const orderNeededClass = item.orderNeeded > 0 ? "alert-red" : "";
-        const photoHtml = item.imgUrl && item.imgUrl.trim() !== "" 
+        
+        // --- Added Logic: Extract Last Order Date for Footnote ---
+        let lastOrderFootnote = "";
+        if (item.orderTime && item.orderTime.trim() !== "") {
+          let dateOnly = item.orderTime.split(" ")[0]; // Extracts just the DD/MM/YYYY part
+          lastOrderFootnote = `<div style="font-size: 10px; color: #555; margin-top: 6px; line-height: 1.2;"><b>Last order:</b><br>${dateOnly}</div>`;
+        }
+
+        const photoHtml = (item.imgUrl && item.imgUrl.trim() !== "" 
           ? `<img src="${item.imgUrl}" class="item-photo" onclick="openPhotoModal('${item.imgUrl}')">`
-          : `<div class="item-photo no-photo">NO<br>PHOTO</div>`;
+          : `<div class="item-photo no-photo">NO<br>PHOTO</div>`) + lastOrderFootnote;
+        // -----------------------------------------------------------
 
         let backorderHtml = "";
         let pQty = parseInt(item.pendingQty) || 0;
@@ -234,7 +241,7 @@
         }
 
         tr.innerHTML = `
-          <td>${photoHtml}</td>
+          <td style="vertical-align: top;">${photoHtml}</td>
           <td class="col-name" title="${item.description}">${item.description}</td>
           <td class="col-loc">${item.location}</td>
           <td style="font-size: 18px; font-weight: bold; color: #666;">${item.qty}</td>
@@ -263,7 +270,7 @@
         tbody.appendChild(tr);
       });
       
-      updateBadges(); // 每次刷新表格時自動更新數字
+      updateBadges(); 
     }
 
     function filterTable() { renderTable(); }
@@ -469,7 +476,6 @@
     async function saveData(reportType = "STOCK", actionItems = [], providedName = null) {
       if (document.activeElement) document.activeElement.blur();
       
-      // 移除 "No changes detected" 的阻擋機制，允許隨時強制存檔與生成報告
       const modifiedItems = inventoryData.filter(item => item.isModified);
 
       let userName = providedName;
