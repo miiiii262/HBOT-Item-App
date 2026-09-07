@@ -15,17 +15,18 @@
     .search-input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #000; outline: none; box-sizing: border-box; }
     
     .btn-group { display: flex; gap: 10px; }
-    .btn { padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: 2px solid #000; transition: all 0.2s; }
+    .btn { padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: 2px solid #000; transition: all 0.2s; position: relative; }
     .btn-todo { background-color: #fff; color: #000; }
     .btn-todo:hover, .btn-todo:active { background-color: #e0e0e0; }
-    
-    /* 新增的批量收貨按鈕樣式 */
     .btn-receive-batch { background-color: #fff; color: #1e7e34; border-color: #1e7e34; }
     .btn-receive-batch:hover, .btn-receive-batch:active { background-color: #f1f8f3; }
-    
     .btn-save { background-color: #000; color: #fff; }
     .btn-save:hover, .btn-save:active { background-color: #333; color: #fff; }
     
+    /* 通知徽章設計 (Notification Badges) */
+    .badge { position: absolute; top: -8px; right: -8px; background-color: #cc0000; color: white; border-radius: 50%; padding: 3px 8px; font-size: 11px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .badge-green { background-color: #1e7e34; }
+
     .table-container { width: 100%; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 1150px; }
     th { background-color: #000; color: #fff; padding: 12px; text-align: center; font-size: 14px; font-weight: normal; letter-spacing: 1px; }
@@ -75,8 +76,12 @@
       <div class="status-text" id="last-update">Last Update: --</div>
     </div>
     <div class="btn-group">
-      <button class="btn btn-todo" onclick="openTodoModal()">TO-DO LIST</button>
-      <button class="btn btn-receive-batch" onclick="openReceiveModal()">PENDING RECEIVE</button>
+      <button class="btn btn-todo" onclick="openTodoModal()">
+        TO-DO LIST <span id="todo-badge" class="badge" style="display:none;">0</span>
+      </button>
+      <button class="btn btn-receive-batch" onclick="openReceiveModal()">
+        PENDING RECEIVE <span id="receive-badge" class="badge badge-green" style="display:none;">0</span>
+      </button>
       <button class="btn btn-save" id="save-btn" onclick="saveData('STOCK', [], null)">SAVE RECORD</button>
     </div>
   </div>
@@ -110,7 +115,6 @@
     <img id="enlarged-img" src="" style="max-width: 90%; max-height: 90%; border: 4px solid #fff; object-fit: contain;">
   </div>
 
-  <!-- TO-DO LIST MODAL -->
   <div id="todo-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeTodoModal()">&times;</span>
@@ -133,7 +137,6 @@
     </div>
   </div>
 
-  <!-- 新增：PENDING RECEIVE MODAL -->
   <div id="receive-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeReceiveModal()">&times;</span>
@@ -182,6 +185,25 @@
       else { item.actionLog = msg; }
     }
 
+    // 計算並更新上方按鈕的通知徽章
+    function updateBadges() {
+      let todoCount = 0;
+      let receiveCount = 0;
+      
+      inventoryData.forEach(item => {
+        if (item.orderNeeded > 0) todoCount++;
+        if (parseInt(item.pendingQty) > 0) receiveCount++;
+      });
+      
+      const tBadge = document.getElementById('todo-badge');
+      if (todoCount > 0) { tBadge.style.display = 'inline-block'; tBadge.innerText = todoCount; }
+      else { tBadge.style.display = 'none'; }
+      
+      const rBadge = document.getElementById('receive-badge');
+      if (receiveCount > 0) { rBadge.style.display = 'inline-block'; rBadge.innerText = receiveCount; }
+      else { rBadge.style.display = 'none'; }
+    }
+
     function renderTable() {
       const tbody = document.getElementById('inventory-list');
       tbody.innerHTML = "";
@@ -203,7 +225,6 @@
         let pQty = parseInt(item.pendingQty) || 0;
         
         if(item.isOrdered === 'Y' || pQty > 0) {
-          // 移除單獨的 Receive 按鈕，讓介面更乾淨，強制員工使用統一的 Batch Receive
           backorderHtml = `
             <div class="pending-box">
               <span class="pending-title">IN TRANSIT: ${pQty}</span>
@@ -241,6 +262,8 @@
         `;
         tbody.appendChild(tr);
       });
+      
+      updateBadges(); // 每次刷新表格時自動更新數字
     }
 
     function filterTable() { renderTable(); }
@@ -292,7 +315,6 @@
     function openPhotoModal(url) { document.getElementById('enlarged-img').src = url; document.getElementById('photo-modal').style.display = 'flex'; }
     function closePhotoModal() { document.getElementById('photo-modal').style.display = 'none'; }
     
-    // --- TO-DO LIST LOGIC ---
     function openTodoModal() {
       const tbody = document.getElementById('todo-list-body'); tbody.innerHTML = ""; document.getElementById('select-all').checked = false;
       let hasTasks = false;
@@ -355,7 +377,6 @@
       if (actionItems.length > 0) { saveData("ORDER", actionItems, name); }
     }
 
-    // --- NEW PENDING RECEIVE LOGIC ---
     function openReceiveModal() {
       const tbody = document.getElementById('receive-list-body'); 
       tbody.innerHTML = ""; 
@@ -392,7 +413,6 @@
       const checkboxes = document.querySelectorAll('.row-cb-rcv:checked');
       if(checkboxes.length === 0) { alert("Please select at least one item to receive."); return; }
 
-      // 只詢問一次名字
       let name = prompt("Enter your Name to confirm receiving & generate Record:", "");
       if(!name || name.trim() === "") return;
 
@@ -446,11 +466,11 @@
       if (actionItems.length > 0) { saveData("RECEIVE", actionItems, name); }
     }
 
-    // --- SAVE LOGIC ---
     async function saveData(reportType = "STOCK", actionItems = [], providedName = null) {
       if (document.activeElement) document.activeElement.blur();
+      
+      // 移除 "No changes detected" 的阻擋機制，允許隨時強制存檔與生成報告
       const modifiedItems = inventoryData.filter(item => item.isModified);
-      if (modifiedItems.length === 0) { alert("No changes detected."); return; }
 
       let userName = providedName;
       if (!userName) {
