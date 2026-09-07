@@ -162,10 +162,21 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     let inventoryData = [];
 
-    async function loadData() {
+async function loadData() {
       try {
         const response = await fetch(API_URL + "?action=get");
-        inventoryData = await response.json();
+        const result = await response.json();
+        
+        // Parse the new data structure from the backend
+        if (result.items) {
+          inventoryData = result.items;
+          if (result.lastUpdate && result.lastUpdate !== "--") {
+            document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
+          }
+        } else {
+          inventoryData = result; // Fallback just in case
+        }
+        
         inventoryData.forEach(item => {
           item.isModified = false;
           item.actionLog = ""; 
@@ -176,6 +187,8 @@
         renderTable();
       } catch (error) {
         document.getElementById('loading').innerText = "ERROR: Failed to load data.";
+      }
+    }
       }
     }
 
