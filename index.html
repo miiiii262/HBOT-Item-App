@@ -18,6 +18,11 @@
     .btn { padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: 2px solid #000; transition: all 0.2s; }
     .btn-todo { background-color: #fff; color: #000; }
     .btn-todo:hover, .btn-todo:active { background-color: #e0e0e0; }
+    
+    /* 新增的批量收貨按鈕樣式 */
+    .btn-receive-batch { background-color: #fff; color: #1e7e34; border-color: #1e7e34; }
+    .btn-receive-batch:hover, .btn-receive-batch:active { background-color: #f1f8f3; }
+    
     .btn-save { background-color: #000; color: #fff; }
     .btn-save:hover, .btn-save:active { background-color: #333; color: #fff; }
     
@@ -47,8 +52,6 @@
     .pending-box { padding: 8px; background-color: #f1f8f3; border: 2px solid #1e7e34; border-radius: 4px; text-align: left; min-width: 110px; }
     .pending-title { color: #1e7e34; font-size: 13px; font-weight: bold; display: block; margin-bottom: 4px; border-bottom: 1px solid #1e7e34; padding-bottom: 2px; }
     .order-info { font-size: 11px; color: #555; line-height: 1.3; }
-    .btn-receive { margin-top: 8px; width: 100%; font-size: 12px; padding: 6px; background-color: #fff; border: 2px solid #000; cursor: pointer; font-weight: bold; transition: background-color 0.2s; }
-    .btn-receive:hover { background-color: #1e7e34; color: #fff; border-color: #1e7e34; }
     
     .remark-input { width: 90%; padding: 8px; font-size: 14px; border: 1px solid #000; outline: none; }
     .date-input { width: 115px; padding: 6px; font-size: 13px; border: 1px solid #000; outline: none; font-family: sans-serif; }
@@ -73,6 +76,7 @@
     </div>
     <div class="btn-group">
       <button class="btn btn-todo" onclick="openTodoModal()">TO-DO LIST</button>
+      <button class="btn btn-receive-batch" onclick="openReceiveModal()">PENDING RECEIVE</button>
       <button class="btn btn-save" id="save-btn" onclick="saveData('STOCK', [], null)">SAVE RECORD</button>
     </div>
   </div>
@@ -106,6 +110,7 @@
     <img id="enlarged-img" src="" style="max-width: 90%; max-height: 90%; border: 4px solid #fff; object-fit: contain;">
   </div>
 
+  <!-- TO-DO LIST MODAL -->
   <div id="todo-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeTodoModal()">&times;</span>
@@ -124,6 +129,29 @@
       </table>
       <div style="text-align: right;">
         <button class="btn btn-save" onclick="batchPlaceOrder()">Execute Batch Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增：PENDING RECEIVE MODAL -->
+  <div id="receive-modal" class="modal-overlay">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeReceiveModal()">&times;</span>
+      <h2 style="margin-top:0; border-bottom: 2px solid #1e7e34; padding-bottom:10px; color:#1e7e34;">BATCH RECEIVE LIST</h2>
+      <table style="min-width: 100%; margin-bottom: 20px;">
+        <thead>
+          <tr>
+            <th style="width: 40px; background-color:#1e7e34;"><input type="checkbox" id="select-all-receive" class="todo-checkbox" onchange="toggleSelectAllReceive(this)"></th>
+            <th style="text-align: left; background-color:#1e7e34;">ITEM DESCRIPTION</th>
+            <th style="background-color:#1e7e34;">EXPECTED QTY</th>
+            <th style="background-color:#1e7e34;">RECEIVED QTY</th>
+            <th style="width: 30%; background-color:#1e7e34;">REMARK</th>
+          </tr>
+        </thead>
+        <tbody id="receive-list-body"></tbody>
+      </table>
+      <div style="text-align: right;">
+        <button class="btn btn-save" style="background-color:#1e7e34; border-color:#1e7e34;" onclick="batchReceiveItem()">Execute Batch Receive</button>
       </div>
     </div>
   </div>
@@ -175,11 +203,11 @@
         let pQty = parseInt(item.pendingQty) || 0;
         
         if(item.isOrdered === 'Y' || pQty > 0) {
+          // 移除單獨的 Receive 按鈕，讓介面更乾淨，強制員工使用統一的 Batch Receive
           backorderHtml = `
             <div class="pending-box">
               <span class="pending-title">IN TRANSIT: ${pQty}</span>
               <span class="order-info">By: ${item.orderedBy}<br>${item.orderTime}</span>
-              <button class="btn-receive" onclick="receiveItem(${index})">RECEIVE</button>
             </div>
           `;
         }
@@ -261,56 +289,10 @@
       appendLog(inventoryData[index], `Expiry Date updated to ${val}`);
     }
 
-    function receiveItem(index) {
-      let pending = parseInt(inventoryData[index].pendingQty) || 0;
-      let qty = prompt(`[${inventoryData[index].description}]\n\nCurrently on BACKORDER: ${pending}\n\nEnter the exact amount you received today:`, pending);
-      
-      if(qty !== null && qty.trim() !== "" && !isNaN(qty)) {
-        let r = parseInt(qty);
-        if(r >= 0) {
-          let name = prompt("Enter your Name to generate Receiving Record:", "");
-          if(!name || name.trim() === "") return;
-
-          inventoryData[index].stock = (parseInt(inventoryData[index].stock) || 0) + r;
-          let logMsg = `Received ${r} items`;
-          let missingCount = 0;
-          
-          if (r < pending) {
-            let missing = pending - r;
-            let keepPending = confirm(`WARNING: You ordered ${pending} but only received ${r}.\nThere are ${missing} items missing.\n\nDo you want to keep these ${missing} items on BACKORDER?\n\n- Click OK to keep them Pending.\n- Click Cancel if the supplier cancelled them.`);
-            if(keepPending) {
-                inventoryData[index].pendingQty = missing;
-                logMsg += ` (${missing} kept on backorder)`;
-                missingCount = missing;
-            } else {
-                inventoryData[index].pendingQty = 0;
-                logMsg += ` (${missing} cancelled from backorder)`;
-                missingCount = missing + " (Cancelled)";
-            }
-          } else {
-             inventoryData[index].pendingQty = Math.max(0, pending - r);
-             logMsg += ` (Order complete)`;
-          }
-          
-          let target = parseInt(inventoryData[index].qty) || 0;
-          inventoryData[index].orderNeeded = Math.max(0, target - inventoryData[index].stock - inventoryData[index].pendingQty);
-          if(inventoryData[index].pendingQty === 0) {
-            inventoryData[index].isOrdered = ""; inventoryData[index].orderedBy = ""; inventoryData[index].orderTime = "";
-          }
-          inventoryData[index].isModified = true;
-          appendLog(inventoryData[index], logMsg);
-          
-          let actionItems = [{ desc: inventoryData[index].description, qty: r, missing: missingCount }];
-          renderTable();
-          
-          // 立即執行存檔並生成專屬收貨單
-          saveData("RECEIVE", actionItems, name);
-        }
-      }
-    }
-
     function openPhotoModal(url) { document.getElementById('enlarged-img').src = url; document.getElementById('photo-modal').style.display = 'flex'; }
     function closePhotoModal() { document.getElementById('photo-modal').style.display = 'none'; }
+    
+    // --- TO-DO LIST LOGIC ---
     function openTodoModal() {
       const tbody = document.getElementById('todo-list-body'); tbody.innerHTML = ""; document.getElementById('select-all').checked = false;
       let hasTasks = false;
@@ -331,6 +313,7 @@
       if(!hasTasks) { tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align:center;">No items currently need to be ordered.</td></tr>`; }
       document.getElementById('todo-modal').style.display = 'flex';
     }
+    
     function closeTodoModal() { document.getElementById('todo-modal').style.display = 'none'; }
     function toggleSelectAll(source) { document.querySelectorAll('.row-cb').forEach(cb => cb.checked = source.checked); }
 
@@ -369,10 +352,101 @@
       renderTable();
       closeTodoModal();
       
-      // 立即執行存檔並生成專屬訂單
       if (actionItems.length > 0) { saveData("ORDER", actionItems, name); }
     }
 
+    // --- NEW PENDING RECEIVE LOGIC ---
+    function openReceiveModal() {
+      const tbody = document.getElementById('receive-list-body'); 
+      tbody.innerHTML = ""; 
+      document.getElementById('select-all-receive').checked = false;
+      
+      let hasTasks = false;
+      inventoryData.forEach((item, index) => {
+        let pQty = parseInt(item.pendingQty) || 0;
+        if(pQty > 0) {
+          hasTasks = true;
+          let orderInfo = item.orderTime ? `Last ordered: ${item.orderTime} by ${item.orderedBy}` : "No order record";
+          tbody.innerHTML += `
+            <tr>
+              <td><input type="checkbox" class="todo-checkbox row-cb-rcv" data-index="${index}"></td>
+              <td style="text-align:left; font-weight:bold;">
+                ${item.description}
+                <div style="font-size:11px; color:#1e7e34; margin-top:4px;">${orderInfo}</div>
+              </td>
+              <td style="color:#1e7e34; font-weight:bold; text-align:center;">${pQty}</td>
+              <td style="text-align:center;"><input type="number" class="todo-qty-input" id="rcv-qty-${index}" value="${pQty}" min="0"></td>
+              <td><input type="text" class="remark-input" id="rcv-remark-${index}" value="${item.remark}" style="width: 100%; box-sizing: border-box;"></td>
+            </tr>
+          `;
+        }
+      });
+      if(!hasTasks) { tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align:center;">No items currently on backorder.</td></tr>`; }
+      document.getElementById('receive-modal').style.display = 'flex';
+    }
+
+    function closeReceiveModal() { document.getElementById('receive-modal').style.display = 'none'; }
+    function toggleSelectAllReceive(source) { document.querySelectorAll('.row-cb-rcv').forEach(cb => cb.checked = source.checked); }
+
+    function batchReceiveItem() {
+      const checkboxes = document.querySelectorAll('.row-cb-rcv:checked');
+      if(checkboxes.length === 0) { alert("Please select at least one item to receive."); return; }
+
+      // 只詢問一次名字
+      let name = prompt("Enter your Name to confirm receiving & generate Record:", "");
+      if(!name || name.trim() === "") return;
+
+      let actionItems = [];
+
+      checkboxes.forEach(cb => {
+        let idx = cb.getAttribute('data-index');
+        let item = inventoryData[idx];
+        let r = parseInt(document.getElementById(`rcv-qty-${idx}`).value);
+        let newRemark = document.getElementById(`rcv-remark-${idx}`).value;
+        let pending = parseInt(item.pendingQty) || 0;
+        
+        if (isNaN(r) || r < 0) return;
+
+        item.stock = (parseInt(item.stock) || 0) + r;
+        let logMsg = `Received ${r} items`;
+        let missingCount = 0;
+        
+        if (r < pending) {
+          let missing = pending - r;
+          let keepPending = confirm(`[${item.description}]\nYou ordered ${pending} but are receiving ${r}.\nDo you want to keep the missing ${missing} items on BACKORDER?\n\n- OK = Keep on Backorder\n- Cancel = Cancel Missing Items`);
+          if(keepPending) {
+              item.pendingQty = missing;
+              logMsg += ` (${missing} kept on backorder)`;
+              missingCount = missing;
+          } else {
+              item.pendingQty = 0;
+              logMsg += ` (${missing} cancelled)`;
+              missingCount = missing + " (Cancelled)";
+          }
+        } else {
+           item.pendingQty = Math.max(0, pending - r);
+           logMsg += ` (Order complete)`;
+        }
+        
+        let target = parseInt(item.qty) || 0;
+        item.orderNeeded = Math.max(0, target - item.stock - item.pendingQty);
+        if(item.pendingQty === 0) {
+          item.isOrdered = ""; item.orderedBy = ""; item.orderTime = "";
+        }
+        item.remark = newRemark;
+        item.isModified = true;
+        appendLog(item, logMsg);
+        
+        actionItems.push({ desc: item.description, qty: r, missing: missingCount, remark: newRemark });
+      });
+
+      renderTable();
+      closeReceiveModal();
+      
+      if (actionItems.length > 0) { saveData("RECEIVE", actionItems, name); }
+    }
+
+    // --- SAVE LOGIC ---
     async function saveData(reportType = "STOCK", actionItems = [], providedName = null) {
       if (document.activeElement) document.activeElement.blur();
       const modifiedItems = inventoryData.filter(item => item.isModified);
