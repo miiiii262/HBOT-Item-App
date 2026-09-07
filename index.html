@@ -162,19 +162,18 @@
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     let inventoryData = [];
 
-async function loadData() {
+    async function loadData() {
       try {
         const response = await fetch(API_URL + "?action=get");
         const result = await response.json();
         
-        // Parse the new data structure from the backend
         if (result.items) {
           inventoryData = result.items;
           if (result.lastUpdate && result.lastUpdate !== "--") {
             document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
           }
         } else {
-          inventoryData = result; // Fallback just in case
+          inventoryData = result; 
         }
         
         inventoryData.forEach(item => {
@@ -187,8 +186,6 @@ async function loadData() {
         renderTable();
       } catch (error) {
         document.getElementById('loading').innerText = "ERROR: Failed to load data.";
-      }
-    }
       }
     }
 
@@ -229,17 +226,15 @@ async function loadData() {
         
         const orderNeededClass = item.orderNeeded > 0 ? "alert-red" : "";
         
-        // --- Added Logic: Extract Last Order Date for Footnote ---
         let lastOrderFootnote = "";
         if (item.orderTime && item.orderTime.trim() !== "") {
-          let dateOnly = item.orderTime.split(" ")[0]; // Extracts just the DD/MM/YYYY part
+          let dateOnly = item.orderTime.split(" ")[0]; 
           lastOrderFootnote = `<div style="font-size: 10px; color: #555; margin-top: 6px; line-height: 1.2;"><b>Last order:</b><br>${dateOnly}</div>`;
         }
 
         const photoHtml = (item.imgUrl && item.imgUrl.trim() !== "" 
           ? `<img src="${item.imgUrl}" class="item-photo" onclick="openPhotoModal('${item.imgUrl}')">`
           : `<div class="item-photo no-photo">NO<br>PHOTO</div>`) + lastOrderFootnote;
-        // -----------------------------------------------------------
 
         let backorderHtml = "";
         let pQty = parseInt(item.pendingQty) || 0;
