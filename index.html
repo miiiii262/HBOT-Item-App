@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HBOT Inventory System</title>
   <style>
-    body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; margin: auto; background-color: #ffffff; color: #000000; max-width: 1300px; }
+    body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 20px; margin: auto; background-color: #ffffff; color: #000000; max-width: 1400px; }
     
     .header-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #000; }
     .header-title { margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px; }
@@ -22,7 +22,7 @@
     .btn-save:hover, .btn-save:active { background-color: #333; color: #fff; }
     
     .table-container { width: 100%; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 1050px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1150px; }
     th { background-color: #000; color: #fff; padding: 12px; text-align: center; font-size: 14px; font-weight: normal; letter-spacing: 1px; }
     td { padding: 12px 10px; border-bottom: 1px solid #e0e0e0; text-align: center; vertical-align: middle; }
     
@@ -44,8 +44,6 @@
     .stock-val { font-size: 20px; font-weight: bold; width: 45px; text-align: center; margin: 0 6px; }
     
     .alert-red { color: #cc0000; font-weight: bold; }
-    
-    /* 獨立 Backorder 區塊設計 */
     .pending-box { padding: 8px; background-color: #f1f8f3; border: 2px solid #1e7e34; border-radius: 4px; text-align: left; min-width: 110px; }
     .pending-title { color: #1e7e34; font-size: 13px; font-weight: bold; display: block; margin-bottom: 4px; border-bottom: 1px solid #1e7e34; padding-bottom: 2px; }
     .order-info { font-size: 11px; color: #555; line-height: 1.3; }
@@ -53,6 +51,7 @@
     .btn-receive:hover { background-color: #1e7e34; color: #fff; border-color: #1e7e34; }
     
     .remark-input { width: 90%; padding: 8px; font-size: 14px; border: 1px solid #000; outline: none; }
+    .date-input { width: 115px; padding: 6px; font-size: 13px; border: 1px solid #000; outline: none; font-family: sans-serif; }
     .modified-row td:first-child { border-left: 4px solid #000; padding-left: 6px; }
     
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; justify-content: center; align-items: center; }
@@ -74,7 +73,7 @@
     </div>
     <div class="btn-group">
       <button class="btn btn-todo" onclick="openTodoModal()">TO-DO LIST</button>
-      <button class="btn btn-save" id="save-btn" onclick="saveData()">SAVE RECORD</button>
+      <button class="btn btn-save" id="save-btn" onclick="saveData('STOCK', [], null)">SAVE RECORD</button>
     </div>
   </div>
 
@@ -94,7 +93,8 @@
           <th>TARGET</th>
           <th>CURRENT STOCK</th>
           <th style="width: 130px;">ORDER NEEDED</th>
-          <th style="width: 140px;">BACKORDER</th> <!-- 新增獨立欄位 -->
+          <th style="width: 140px;">BACKORDER</th>
+          <th style="width: 130px;">EXPIRY DATE</th>
           <th>REMARKS</th>
         </tr>
       </thead>
@@ -150,11 +150,8 @@
     }
 
     function appendLog(item, msg) {
-      if(item.actionLog) {
-        item.actionLog += " | " + msg;
-      } else {
-        item.actionLog = msg;
-      }
+      if(item.actionLog) { item.actionLog += " | " + msg; } 
+      else { item.actionLog = msg; }
     }
 
     function renderTable() {
@@ -164,9 +161,7 @@
       const searchTerm = document.getElementById('search-bar').value.toLowerCase();
 
       inventoryData.forEach((item, index) => {
-        if(searchTerm && !item.description.toLowerCase().includes(searchTerm) && !item.location.toLowerCase().includes(searchTerm)) {
-          return; 
-        }
+        if(searchTerm && !item.description.toLowerCase().includes(searchTerm) && !item.location.toLowerCase().includes(searchTerm)) { return; }
 
         const tr = document.createElement('tr');
         if(item.isModified) tr.className = "modified-row";
@@ -208,8 +203,9 @@
               <button onclick="updateOrderNeeded(${index}, 1)">+</button>
             </div>
           </td>
-          <td style="vertical-align: middle;">
-            ${backorderHtml}
+          <td style="vertical-align: middle;">${backorderHtml}</td>
+          <td>
+            <input type="date" class="date-input" value="${item.expiryDate || ''}" onchange="updateExpiryDate(${index}, this.value)">
           </td>
           <td>
             <input type="text" class="remark-input" value="${item.remark}" onchange="updateRemark(${index}, this.value)">
@@ -224,7 +220,6 @@
     function updateCurrentStock(index, change) {
       let item = inventoryData[index];
       item.stock = Math.max(0, parseInt(item.stock) + change);
-      
       let qtyNum = parseInt(item.qty) || 0;
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
@@ -238,7 +233,6 @@
       let num = parseInt(val);
       if (isNaN(num) || num < 0) num = 0; 
       item.stock = num;
-      
       let qtyNum = parseInt(item.qty) || 0;
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
@@ -261,6 +255,12 @@
       appendLog(inventoryData[index], `Remark updated`);
     }
 
+    function updateExpiryDate(index, val) {
+      inventoryData[index].expiryDate = val;
+      inventoryData[index].isModified = true;
+      appendLog(inventoryData[index], `Expiry Date updated to ${val}`);
+    }
+
     function receiveItem(index) {
       let pending = parseInt(inventoryData[index].pendingQty) || 0;
       let qty = prompt(`[${inventoryData[index].description}]\n\nCurrently on BACKORDER: ${pending}\n\nEnter the exact amount you received today:`, pending);
@@ -268,8 +268,12 @@
       if(qty !== null && qty.trim() !== "" && !isNaN(qty)) {
         let r = parseInt(qty);
         if(r >= 0) {
+          let name = prompt("Enter your Name to generate Receiving Record:", "");
+          if(!name || name.trim() === "") return;
+
           inventoryData[index].stock = (parseInt(inventoryData[index].stock) || 0) + r;
           let logMsg = `Received ${r} items`;
+          let missingCount = 0;
           
           if (r < pending) {
             let missing = pending - r;
@@ -277,9 +281,11 @@
             if(keepPending) {
                 inventoryData[index].pendingQty = missing;
                 logMsg += ` (${missing} kept on backorder)`;
+                missingCount = missing;
             } else {
                 inventoryData[index].pendingQty = 0;
                 logMsg += ` (${missing} cancelled from backorder)`;
+                missingCount = missing + " (Cancelled)";
             }
           } else {
              inventoryData[index].pendingQty = Math.max(0, pending - r);
@@ -288,31 +294,25 @@
           
           let target = parseInt(inventoryData[index].qty) || 0;
           inventoryData[index].orderNeeded = Math.max(0, target - inventoryData[index].stock - inventoryData[index].pendingQty);
-          
           if(inventoryData[index].pendingQty === 0) {
-            inventoryData[index].isOrdered = "";
-            inventoryData[index].orderedBy = "";
-            inventoryData[index].orderTime = "";
+            inventoryData[index].isOrdered = ""; inventoryData[index].orderedBy = ""; inventoryData[index].orderTime = "";
           }
           inventoryData[index].isModified = true;
           appendLog(inventoryData[index], logMsg);
+          
+          let actionItems = [{ desc: inventoryData[index].description, qty: r, missing: missingCount }];
           renderTable();
+          
+          // 立即執行存檔並生成專屬收貨單
+          saveData("RECEIVE", actionItems, name);
         }
       }
     }
 
-    function openPhotoModal(url) {
-      document.getElementById('enlarged-img').src = url;
-      document.getElementById('photo-modal').style.display = 'flex';
-    }
-    
+    function openPhotoModal(url) { document.getElementById('enlarged-img').src = url; document.getElementById('photo-modal').style.display = 'flex'; }
     function closePhotoModal() { document.getElementById('photo-modal').style.display = 'none'; }
-
     function openTodoModal() {
-      const tbody = document.getElementById('todo-list-body');
-      tbody.innerHTML = "";
-      document.getElementById('select-all').checked = false;
-      
+      const tbody = document.getElementById('todo-list-body'); tbody.innerHTML = ""; document.getElementById('select-all').checked = false;
       let hasTasks = false;
       inventoryData.forEach((item, index) => {
         if(item.orderNeeded > 0) {
@@ -328,32 +328,22 @@
           `;
         }
       });
-      
-      if(!hasTasks) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align:center;">No items currently need to be ordered.</td></tr>`;
-      }
+      if(!hasTasks) { tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align:center;">No items currently need to be ordered.</td></tr>`; }
       document.getElementById('todo-modal').style.display = 'flex';
     }
-
     function closeTodoModal() { document.getElementById('todo-modal').style.display = 'none'; }
-
-    function toggleSelectAll(source) {
-      const checkboxes = document.querySelectorAll('.row-cb');
-      checkboxes.forEach(cb => cb.checked = source.checked);
-    }
+    function toggleSelectAll(source) { document.querySelectorAll('.row-cb').forEach(cb => cb.checked = source.checked); }
 
     function batchPlaceOrder() {
       const checkboxes = document.querySelectorAll('.row-cb:checked');
-      if(checkboxes.length === 0) {
-        alert("Please select at least one item to order.");
-        return;
-      }
+      if(checkboxes.length === 0) { alert("Please select at least one item to order."); return; }
 
-      let name = prompt("Enter your Name to confirm batch placement:", "");
+      let name = prompt("Enter your Name to confirm batch placement & generate Purchase Order:", "");
       if(!name || name.trim() === "") return;
 
       let now = new Date();
       let timeStr = now.toLocaleDateString('en-GB') + " " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      let actionItems = [];
 
       checkboxes.forEach(cb => {
         let idx = cb.getAttribute('data-index');
@@ -371,29 +361,34 @@
           inventoryData[idx].remark = newRemark;
           inventoryData[idx].isModified = true;
           appendLog(inventoryData[idx], `Ordered ${orderAmt} items`);
+          
+          actionItems.push({ desc: inventoryData[idx].description, qty: orderAmt, remark: newRemark });
         }
       });
 
       renderTable();
       closeTodoModal();
+      
+      // 立即執行存檔並生成專屬訂單
+      if (actionItems.length > 0) { saveData("ORDER", actionItems, name); }
     }
 
-    async function saveData() {
-      if (document.activeElement) {
-        document.activeElement.blur();
-      }
-
+    async function saveData(reportType = "STOCK", actionItems = [], providedName = null) {
+      if (document.activeElement) document.activeElement.blur();
       const modifiedItems = inventoryData.filter(item => item.isModified);
       if (modifiedItems.length === 0) { alert("No changes detected."); return; }
 
-      const userName = prompt("Enter Staff Name to confirm save (This triggers the PDF snapshot):", "");
-      if (userName === null || userName.trim() === "") return;
+      let userName = providedName;
+      if (!userName) {
+         userName = prompt("Enter Staff Name to confirm save (This triggers the PDF snapshot):", "");
+         if (!userName || userName.trim() === "") return;
+      }
 
       const saveBtn = document.getElementById('save-btn');
       saveBtn.innerText = "SAVING & GENERATING PDF...";
       saveBtn.disabled = true;
 
-      const payload = { userName: userName.trim(), items: modifiedItems };
+      const payload = { userName: userName.trim(), items: modifiedItems, reportType: reportType, actionItems: actionItems };
 
       try {
         const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -401,18 +396,15 @@
 
         if (result.success) {
           document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
-          alert("Records saved and Ward Stock PDF generated.");
+          let alertMsg = reportType === "ORDER" ? "Purchase Order generated!" : (reportType === "RECEIVE" ? "Receiving Record generated!" : "Ward Stock PDF generated!");
+          alert("Records saved and " + alertMsg);
           
-          inventoryData.forEach(item => {
-            item.isModified = false;
-            item.actionLog = ""; 
-          });
+          inventoryData.forEach(item => { item.isModified = false; item.actionLog = ""; });
           renderTable();
         }
       } catch (error) {
         alert("ERROR: Failed to save. Please check network.");
       }
-
       saveBtn.innerText = "SAVE RECORD";
       saveBtn.disabled = false;
     }
