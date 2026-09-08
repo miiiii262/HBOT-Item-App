@@ -161,8 +161,22 @@
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     let inventoryData = [];
+    
+    // 全域變數：防呆機制，紀錄是否有未儲存的變更
+    let hasUnsavedChanges = false;
+
+    // 監聽網頁關閉或重新整理事件
+    window.addEventListener('beforeunload', function (e) {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // 觸發瀏覽器內建的警告視窗
+      }
+    });
 
     async function loadData() {
+      document.getElementById('inventory-table').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+      
       try {
         const response = await fetch(API_URL + "?action=get");
         const result = await response.json();
@@ -180,6 +194,8 @@
           item.isModified = false;
           item.actionLog = ""; 
         });
+        
+        hasUnsavedChanges = false; // 載入新資料後，重置防呆鎖
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('inventory-table').style.display = 'table';
@@ -290,6 +306,7 @@
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
       item.isModified = true;
+      hasUnsavedChanges = true; // 觸發防呆鎖
       appendLog(item, `Stock adjusted to ${item.stock}`);
       renderTable();
     }
@@ -303,6 +320,7 @@
       let pending = parseInt(item.pendingQty) || 0;
       item.orderNeeded = Math.max(0, qtyNum - item.stock - pending);
       item.isModified = true;
+      hasUnsavedChanges = true; // 觸發防呆鎖
       appendLog(item, `Stock typed manually as ${item.stock}`);
       renderTable();
     }
@@ -311,6 +329,7 @@
       let item = inventoryData[index];
       item.orderNeeded = Math.max(0, parseInt(item.orderNeeded) + change);
       item.isModified = true;
+      hasUnsavedChanges = true; // 觸發防呆鎖
       appendLog(item, `Order needed adjusted to ${item.orderNeeded}`);
       renderTable();
     }
@@ -318,12 +337,14 @@
     function updateRemark(index, val) {
       inventoryData[index].remark = val;
       inventoryData[index].isModified = true;
+      hasUnsavedChanges = true; // 觸發防呆鎖
       appendLog(inventoryData[index], `Remark updated`);
     }
 
     function updateExpiryDate(index, val) {
       inventoryData[index].expiryDate = val;
       inventoryData[index].isModified = true;
+      hasUnsavedChanges = true; // 觸發防呆鎖
       appendLog(inventoryData[index], `Expiry Date updated to ${val}`);
     }
 
@@ -380,6 +401,7 @@
           inventoryData[idx].orderNeeded = Math.max(0, target - inventoryData[idx].stock - inventoryData[idx].pendingQty);
           inventoryData[idx].remark = newRemark;
           inventoryData[idx].isModified = true;
+          hasUnsavedChanges = true;
           appendLog(inventoryData[idx], `Ordered ${orderAmt} items`);
           
           actionItems.push({ desc: inventoryData[idx].description, qty: orderAmt, remark: newRemark });
@@ -470,6 +492,7 @@
         }
         item.remark = newRemark;
         item.isModified = true;
+        hasUnsavedChanges = true;
         appendLog(item, logMsg);
         
         actionItems.push({ desc: item.description, qty: r, missing: missingCount, remark: newRemark });
@@ -503,18 +526,19 @@
         const result = await response.json();
 
         if (result.success) {
-          document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
+          hasUnsavedChanges = false; // 存檔成功，解除防呆鎖
+          
           let alertMsg = reportType === "ORDER" ? "Purchase Order generated!" : (reportType === "RECEIVE" ? "Receiving Record generated!" : "Ward Stock PDF generated!");
           alert("Records saved and " + alertMsg);
           
-          inventoryData.forEach(item => { item.isModified = false; item.actionLog = ""; });
-          renderTable();
+          // 自動同步：存檔完成後，自動從伺服器抓取最新資料，確保畫面上呈現同事的最新進度
+          await loadData(); 
         }
       } catch (error) {
         alert("ERROR: Failed to save. Please check network.");
+        saveBtn.innerText = "SAVE RECORD";
+        saveBtn.disabled = false;
       }
-      saveBtn.innerText = "SAVE RECORD";
-      saveBtn.disabled = false;
     }
 
     loadData();
