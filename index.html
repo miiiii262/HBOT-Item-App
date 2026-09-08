@@ -249,9 +249,7 @@
         
         if (result.items) {
           inventoryData = result.items;
-          if (result.lastUpdate && result.lastUpdate !== "--") {
-            document.getElementById('last-update').innerText = "Last Update: " + result.lastUpdate;
-          }
+          document.getElementById('last-update').innerText = "Last Update: " + (result.lastUpdate || "--");
         } else {
           inventoryData = result; 
         }
