@@ -11,7 +11,6 @@
     .header-title { margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px; }
     .status-text { font-size: 13px; color: #666; margin-top: 5px; }
     
-    /* V2 清單切換按鈕樣式 */
     .list-switcher { margin-bottom: 20px; display: flex; gap: 10px; }
     .list-btn { padding: 10px 20px; font-size: 16px; font-weight: bold; border: 2px solid #1e7e34; cursor: pointer; transition: all 0.2s ease; }
     .active-list { background-color: #1e7e34; color: #ffffff; }
@@ -73,7 +72,6 @@
     
     #loading { text-align: center; padding: 40px; font-size: 16px; color: #666; }
 
-    /* Sticky Unsaved Counter 樣式 */
     #sticky-counter { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background-color: #ff9500; color: #000; text-align: center; padding: 15px; font-weight: bold; font-size: 16px; box-shadow: 0 -3px 15px rgba(0,0,0,0.3); z-index: 1000; box-sizing: border-box; }
     .btn-discard { margin-left: 20px; padding: 6px 12px; background-color: #cc0000; color: white; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; font-size: 14px; transition: background-color 0.2s; }
     .btn-discard:hover { background-color: #990000; }
@@ -97,7 +95,6 @@
     </div>
   </div>
 
-  <!-- V2 清單切換器 -->
   <div class="list-switcher">
     <button id="btn-AppInventory" class="list-btn active-list" onclick="switchList('AppInventory')">PURCHASE ITEMS</button>
     <button id="btn-JosItem" class="list-btn inactive-list" onclick="switchList('Jos Item')">JOS ITEMS</button>
@@ -128,7 +125,6 @@
     </table>
   </div>
 
-  <!-- Sticky Unsaved Counter (嚴格去除 emoji) -->
   <div id="sticky-counter">
     [WARNING]: <span id="unsaved-count">0</span> Items Modified - Awaiting Save
     <button class="btn-discard" onclick="discardDraft()">Discard Changes</button>
@@ -141,7 +137,8 @@
   <div id="todo-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeTodoModal()">&times;</span>
-      <h2 style="margin-top:0; border-bottom: 2px solid #000; padding-bottom:10px;">BATCH ORDER TO-DO LIST</h2>
+      <!-- [FIX 3] Added ID to dynamically change title -->
+      <h2 id="todo-modal-title" style="margin-top:0; border-bottom: 2px solid #000; padding-bottom:10px;">BATCH ORDER TO-DO LIST</h2>
       <table style="min-width: 100%; margin-bottom: 20px;">
         <thead>
           <tr>
@@ -163,7 +160,8 @@
   <div id="receive-modal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeReceiveModal()">&times;</span>
-      <h2 style="margin-top:0; border-bottom: 2px solid #1e7e34; padding-bottom:10px; color:#1e7e34;">BATCH RECEIVE LIST</h2>
+      <!-- [FIX 3] Added ID to dynamically change title -->
+      <h2 id="receive-modal-title" style="margin-top:0; border-bottom: 2px solid #1e7e34; padding-bottom:10px; color:#1e7e34;">BATCH RECEIVE LIST</h2>
       <table style="min-width: 100%; margin-bottom: 20px;">
         <thead>
           <tr>
@@ -185,12 +183,10 @@
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
     
-    // [V2 修改] 全域變數新增 listType，預設載入 AppInventory
     let inventoryData = [];
     let hasUnsavedChanges = false;
     let currentListType = "AppInventory";
 
-    // 離開網頁時的警告 (Safety Lock)
     window.addEventListener('beforeunload', function (e) {
       if (hasUnsavedChanges) {
         e.preventDefault();
@@ -198,12 +194,10 @@
       }
     });
 
-    // [V2 修改] 動態產生 Storage Key，隔離兩張清單的草稿
     function getStorageKey() {
       return "hbot_draft_data_" + currentListType;
     }
 
-    // [V2 修改] 處理清單切換邏輯
     function switchList(newListType) {
       if (newListType === currentListType) return;
       
@@ -214,15 +208,12 @@
       
       currentListType = newListType;
       
-      // 更新按鈕樣式
       document.getElementById("btn-AppInventory").className = (currentListType === "AppInventory") ? "list-btn active-list" : "list-btn inactive-list";
       document.getElementById("btn-JosItem").className = (currentListType === "Jos Item") ? "list-btn active-list" : "list-btn inactive-list";
       
-      // 重新載入資料
       loadData();
     }
 
-    // 核心功能：將當前未存檔的變更寫入 localStorage
     function saveDraftToLocal() {
       let draftObj = {};
       inventoryData.forEach(item => {
@@ -237,14 +228,11 @@
           };
         }
       });
-      // [V2 修改] 使用動態 Key
       localStorage.setItem(getStorageKey(), JSON.stringify(draftObj));
     }
 
-    // 清除草稿
     function discardDraft() {
       if(confirm("Are you sure you want to discard all unsaved changes and reload from the server?")) {
-        // [V2 修改] 使用動態 Key
         localStorage.removeItem(getStorageKey());
         hasUnsavedChanges = false;
         loadData();
@@ -257,7 +245,6 @@
       document.getElementById('loading').style.display = 'block';
       
       try {
-        // [V2 修改] 發送 GET 請求時附帶 listType 參數
         const url = API_URL + "?listType=" + encodeURIComponent(currentListType);
         const response = await fetch(url);
         const result = await response.json();
@@ -278,7 +265,6 @@
 
         hasUnsavedChanges = false; 
 
-        // [V2 修改] 讀取 Local Storage 中的專屬草稿
         let savedDraft = localStorage.getItem(getStorageKey());
         if (savedDraft) {
           try {
@@ -296,7 +282,7 @@
               }
             });
           } catch(e) {
-            localStorage.removeItem(getStorageKey()); // 若草稿損毀則清除
+            localStorage.removeItem(getStorageKey());
           }
         }
         
@@ -324,7 +310,6 @@
         if (item.isModified) modifiedCount++;
       });
       
-      // 更新上方提醒
       const tBadge = document.getElementById('todo-badge');
       if (todoCount > 0) { tBadge.style.display = 'inline-block'; tBadge.innerText = todoCount; }
       else { tBadge.style.display = 'none'; }
@@ -333,7 +318,6 @@
       if (receiveCount > 0) { rBadge.style.display = 'inline-block'; rBadge.innerText = receiveCount; }
       else { rBadge.style.display = 'none'; }
 
-      // 更新下方 Sticky Counter
       const stickyBar = document.getElementById('sticky-counter');
       if (modifiedCount > 0) {
         stickyBar.style.display = 'block';
@@ -466,6 +450,10 @@
     function closePhotoModal() { document.getElementById('photo-modal').style.display = 'none'; }
     
     function openTodoModal() {
+      // [FIX 3] Dynamic Modal Title
+      const titlePrefix = (currentListType === "Jos Item") ? "[JOS ITEMS]" : "[PURCHASE ITEMS]";
+      document.getElementById('todo-modal-title').innerText = titlePrefix + " BATCH ORDER TO-DO LIST";
+
       const tbody = document.getElementById('todo-list-body'); tbody.innerHTML = ""; document.getElementById('select-all').checked = false;
       let hasTasks = false;
       inventoryData.forEach((item, index) => {
@@ -530,6 +518,10 @@
     }
 
     function openReceiveModal() {
+      // [FIX 3] Dynamic Modal Title
+      const titlePrefix = (currentListType === "Jos Item") ? "[JOS ITEMS]" : "[PURCHASE ITEMS]";
+      document.getElementById('receive-modal-title').innerText = titlePrefix + " BATCH RECEIVE LIST";
+
       const tbody = document.getElementById('receive-list-body'); 
       tbody.innerHTML = ""; 
       document.getElementById('select-all-receive').checked = false;
@@ -635,7 +627,6 @@
       saveBtn.innerText = "SAVING & GENERATING PDF...";
       saveBtn.disabled = true;
 
-      // [V2 修改] 在 payload 中加上 listType，讓後端知道要寫入哪個分頁
       const payload = { 
         userName: userName.trim(), 
         listType: currentListType, 
@@ -650,22 +641,26 @@
 
         if (result.success) {
           hasUnsavedChanges = false; 
-          // [V2 修改] 儲存成功後，清空當前清單專屬的草稿
           localStorage.removeItem(getStorageKey());
           
           let alertMsg = reportType === "ORDER" ? "Purchase Order generated!" : (reportType === "RECEIVE" ? "Receiving Record generated!" : "Ward Stock PDF generated!");
           alert("Records saved and " + alertMsg);
           
           await loadData(); 
+          
+          // [FIX 1] Re-enable the save button upon success
+          saveBtn.innerText = "SAVE RECORD";
+          saveBtn.disabled = false;
         }
       } catch (error) {
         alert("ERROR: Failed to save. Please check network.");
+        
+        // [FIX 1] Re-enable the save button upon failure
         saveBtn.innerText = "SAVE RECORD";
         saveBtn.disabled = false;
       }
     }
 
-    // 系統載入時，直接讀取預設的 AppInventory 清單
     loadData();
   </script>
 </body>
