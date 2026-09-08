@@ -11,6 +11,13 @@
     .header-title { margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px; }
     .status-text { font-size: 13px; color: #666; margin-top: 5px; }
     
+    /* V2 清單切換按鈕樣式 */
+    .list-switcher { margin-bottom: 20px; display: flex; gap: 10px; }
+    .list-btn { padding: 10px 20px; font-size: 16px; font-weight: bold; border: 2px solid #1e7e34; cursor: pointer; transition: all 0.2s ease; }
+    .active-list { background-color: #1e7e34; color: #ffffff; }
+    .inactive-list { background-color: #ffffff; color: #1e7e34; }
+    .inactive-list:hover { background-color: #e6f2e8; }
+
     .search-container { margin-bottom: 20px; }
     .search-input { width: 100%; padding: 12px; font-size: 16px; border: 2px solid #000; outline: none; box-sizing: border-box; }
     
@@ -90,6 +97,12 @@
     </div>
   </div>
 
+  <!-- V2 清單切換器 -->
+  <div class="list-switcher">
+    <button id="btn-AppInventory" class="list-btn active-list" onclick="switchList('AppInventory')">PURCHASE ITEMS</button>
+    <button id="btn-JosItem" class="list-btn inactive-list" onclick="switchList('Jos Item')">JOS ITEMS</button>
+  </div>
+
   <div class="search-container">
     <input type="text" id="search-bar" class="search-input" onkeyup="filterTable()" placeholder="Search item description or location...">
   </div>
@@ -115,9 +128,9 @@
     </table>
   </div>
 
-  <!-- Sticky Unsaved Counter -->
+  <!-- Sticky Unsaved Counter (嚴格去除 emoji) -->
   <div id="sticky-counter">
-    ⚠️ <span id="unsaved-count">0</span> Items Modified - Awaiting Save
+    [WARNING]: <span id="unsaved-count">0</span> Items Modified - Awaiting Save
     <button class="btn-discard" onclick="discardDraft()">Discard Changes</button>
   </div>
 
@@ -171,8 +184,11 @@
 
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbwbhpX7ZHMNskpxRGz4mtQTBNqAlRHlKNY_bxB4kdP0J4F7X40-UAPFdEVpxeeYBRY/exec";
+    
+    // [V2 修改] 全域變數新增 listType，預設載入 AppInventory
     let inventoryData = [];
     let hasUnsavedChanges = false;
+    let currentListType = "AppInventory";
 
     // 離開網頁時的警告 (Safety Lock)
     window.addEventListener('beforeunload', function (e) {
@@ -181,6 +197,30 @@
         e.returnValue = ''; 
       }
     });
+
+    // [V2 修改] 動態產生 Storage Key，隔離兩張清單的草稿
+    function getStorageKey() {
+      return "hbot_draft_data_" + currentListType;
+    }
+
+    // [V2 修改] 處理清單切換邏輯
+    function switchList(newListType) {
+      if (newListType === currentListType) return;
+      
+      if (hasUnsavedChanges) {
+        alert("Warning: You have unsaved changes. Please save or discard them before switching lists.");
+        return;
+      }
+      
+      currentListType = newListType;
+      
+      // 更新按鈕樣式
+      document.getElementById("btn-AppInventory").className = (currentListType === "AppInventory") ? "list-btn active-list" : "list-btn inactive-list";
+      document.getElementById("btn-JosItem").className = (currentListType === "Jos Item") ? "list-btn active-list" : "list-btn inactive-list";
+      
+      // 重新載入資料
+      loadData();
+    }
 
     // 核心功能：將當前未存檔的變更寫入 localStorage
     function saveDraftToLocal() {
@@ -197,13 +237,15 @@
           };
         }
       });
-      localStorage.setItem('hbot_draft_data', JSON.stringify(draftObj));
+      // [V2 修改] 使用動態 Key
+      localStorage.setItem(getStorageKey(), JSON.stringify(draftObj));
     }
 
     // 清除草稿
     function discardDraft() {
       if(confirm("Are you sure you want to discard all unsaved changes and reload from the server?")) {
-        localStorage.removeItem('hbot_draft_data');
+        // [V2 修改] 使用動態 Key
+        localStorage.removeItem(getStorageKey());
         hasUnsavedChanges = false;
         loadData();
       }
@@ -215,7 +257,9 @@
       document.getElementById('loading').style.display = 'block';
       
       try {
-        const response = await fetch(API_URL + "?action=get");
+        // [V2 修改] 發送 GET 請求時附帶 listType 參數
+        const url = API_URL + "?listType=" + encodeURIComponent(currentListType);
+        const response = await fetch(url);
         const result = await response.json();
         
         if (result.items) {
@@ -234,8 +278,8 @@
 
         hasUnsavedChanges = false; 
 
-        // 讀取 Local Storage 中的草稿
-        let savedDraft = localStorage.getItem('hbot_draft_data');
+        // [V2 修改] 讀取 Local Storage 中的專屬草稿
+        let savedDraft = localStorage.getItem(getStorageKey());
         if (savedDraft) {
           try {
             let draftObj = JSON.parse(savedDraft);
@@ -252,7 +296,7 @@
               }
             });
           } catch(e) {
-            localStorage.removeItem('hbot_draft_data'); // 若草稿損毀則清除
+            localStorage.removeItem(getStorageKey()); // 若草稿損毀則清除
           }
         }
         
@@ -260,7 +304,7 @@
         document.getElementById('inventory-table').style.display = 'table';
         renderTable();
       } catch (error) {
-        document.getElementById('loading').innerText = "ERROR: Failed to load data.";
+        document.getElementById('loading').innerText = "ERROR: Failed to load data. Please check network or script URL.";
       }
     }
 
@@ -591,16 +635,23 @@
       saveBtn.innerText = "SAVING & GENERATING PDF...";
       saveBtn.disabled = true;
 
-      const payload = { userName: userName.trim(), items: modifiedItems, reportType: reportType, actionItems: actionItems };
+      // [V2 修改] 在 payload 中加上 listType，讓後端知道要寫入哪個分頁
+      const payload = { 
+        userName: userName.trim(), 
+        listType: currentListType, 
+        items: modifiedItems, 
+        reportType: reportType, 
+        actionItems: actionItems 
+      };
 
       try {
         const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
         const result = await response.json();
 
         if (result.success) {
-          // 成功存檔後，清除防呆鎖與本機草稿
           hasUnsavedChanges = false; 
-          localStorage.removeItem('hbot_draft_data');
+          // [V2 修改] 儲存成功後，清空當前清單專屬的草稿
+          localStorage.removeItem(getStorageKey());
           
           let alertMsg = reportType === "ORDER" ? "Purchase Order generated!" : (reportType === "RECEIVE" ? "Receiving Record generated!" : "Ward Stock PDF generated!");
           alert("Records saved and " + alertMsg);
@@ -614,6 +665,7 @@
       }
     }
 
+    // 系統載入時，直接讀取預設的 AppInventory 清單
     loadData();
   </script>
 </body>
